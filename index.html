@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VOTACION SALA 5</title>
+  <meta name="description" content="SISTEMA DE VOTACION PARA ALUMNOS" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="inicio-mode">
+  <div id="startGate" class="start-gate" role="button" tabindex="0" aria-label="TOCA PARA COMENZAR"></div>
+
+  <main id="app" class="app hidden">
+    <section class="screen screen-active" data-step="1" aria-label="SELECCION DE SALA">
+      <h1>ELIGE TU SALA</h1>
+      <p class="subtitle">PASO 1 DE 4</p>
+      <div id="salaOptions" class="grid-options" role="group" aria-label="OPCIONES DE SALA"></div>
+    </section>
+
+    <section class="screen" data-step="2" aria-label="SELECCION DE GENERO">
+      <p class="subtitle">PASO 2 DE 4</p>
+      <div id="generoOptions" class="grid-options" role="group" aria-label="OPCIONES DE GENERO"></div>
+      <button class="btn-back" type="button" data-go-step="1">VOLVER</button>
+    </section>
+
+    <section class="screen" data-step="3" aria-label="SELECCION DE ALUMNO">
+      <h1>ELIGE TU NOMBRE</h1>
+      <p class="subtitle">PASO 3 DE 4</p>
+      <div id="alumnoOptions" class="list-options" role="group" aria-label="OPCIONES DE ALUMNOS"></div>
+      <button class="btn-back" type="button" data-go-step="2">VOLVER</button>
+    </section>
+
+    <section class="screen" data-step="4" aria-label="SELECCION DE PROPUESTA">
+      <h1>¿Qué nombre de sala te gusta?</h1>
+      <p class="subtitle">PASO 4 DE 4</p>
+      <div id="propuestaOptions" class="list-options" role="group" aria-label="OPCIONES DE PROPUESTA"></div>
+      <button class="btn-back" type="button" data-go-step="3">VOLVER</button>
+    </section>
+
+    <section class="screen" data-step="5" aria-label="VOTO EMITIDO">
+      <h1>¡MUY BIEN, YA VOTASTE!</h1>
+      <p class="subtitle">GRACIAS POR PARTICIPAR</p>
+      <img class="votacion-img" src="images/votacion_correcta.png" alt="VOTACION EXITOSA" />
+    </section>
+  </main>
+
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+    <div class="modal-card">
+      <h1 id="confirmTitle">¿ESTAS SEGURO DE TU VOTO?</h1>
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button id="confirmNo" type="button" class="btn-confirmar btn-secondary">NO</button>
+        <button id="confirmYes" type="button" class="btn-confirmar btn-primary">SI</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js" type="module"></script>
+</body>
+</html>

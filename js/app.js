@@ -1,0 +1,423 @@
+const app = document.getElementById("app");
+const startGate = document.getElementById("startGate");
+const screens = [...document.querySelectorAll(".screen")];
+const salaOptions = document.getElementById("salaOptions");
+const generoOptions = document.getElementById("generoOptions");
+const alumnoOptions = document.getElementById("alumnoOptions");
+const propuestaOptions = document.getElementById("propuestaOptions");
+const backButtons = [...document.querySelectorAll("[data-go-step]")];
+const modal = document.getElementById("confirmModal");
+const confirmYes = document.getElementById("confirmYes");
+const confirmNo = document.getElementById("confirmNo");
+const toast = document.getElementById("toast");
+
+const state = {
+  pasoActual: 1,
+  inicioCompletado: false,
+  sala: null,
+  genero: null,
+  alumno: null,
+  propuesta: null,
+  salas: [],
+  generos: [],
+  alumnosFiltrados: [],
+  propuestasFiltradas: []
+};
+
+const hasConfig =
+  typeof window.SUPABASE_URL === "string" &&
+  typeof window.SUPABASE_ANON_KEY === "string" &&
+  window.SUPABASE_URL.startsWith("https://") &&
+  !window.SUPABASE_URL.includes("TU-PROYECTO") &&
+  !window.SUPABASE_ANON_KEY.includes("TU_ANON_KEY");
+
+const supabase = hasConfig
+  ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
+  : null;
+
+function aMayusculas(valor) {
+  return String(valor ?? "").toUpperCase();
+}
+
+function normalizarTexto(valor) {
+  return aMayusculas(valor)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function irAPaso(numeroPaso) {
+  state.pasoActual = numeroPaso;
+  screens.forEach((screen) => {
+    const isTarget = Number(screen.dataset.step) === numeroPaso;
+    screen.classList.toggle("screen-active", isTarget);
+  });
+}
+
+function activarInicio() {
+  if (state.inicioCompletado) {
+    return;
+  }
+
+  state.inicioCompletado = true;
+  document.body.classList.remove("inicio-mode");
+  document.body.classList.add("paginas-mode");
+  startGate.classList.add("hidden");
+  app.classList.remove("hidden");
+  irAPaso(1);
+}
+
+function mostrarToast(mensaje, duracion = 2500) {
+  toast.textContent = aMayusculas(mensaje);
+  toast.classList.remove("hidden");
+  window.setTimeout(() => toast.classList.add("hidden"), duracion);
+}
+
+function lanzarConfetis(cantidad = 120) {
+  const colores = ["#ff6b6b", "#ffd93d", "#6bcb77", "#4d96ff", "#ff9f1c", "#f15bb5"];
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+
+  for (let i = 0; i < cantidad; i += 1) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+
+    const width = 6 + Math.random() * 8;
+    const height = 8 + Math.random() * 12;
+    const startX = Math.random() * 100;
+    const drift = (Math.random() - 0.5) * 240;
+    const duration = 2200 + Math.random() * 1400;
+    const delay = Math.random() * 300;
+    const color = colores[Math.floor(Math.random() * colores.length)];
+
+    piece.style.left = `${startX}vw`;
+    piece.style.width = `${width.toFixed(1)}px`;
+    piece.style.height = `${height.toFixed(1)}px`;
+    piece.style.background = color;
+    piece.style.setProperty("--drift-x", `${drift.toFixed(1)}px`);
+    piece.style.animationDuration = `${duration.toFixed(0)}ms`;
+    piece.style.animationDelay = `${delay.toFixed(0)}ms`;
+
+    layer.appendChild(piece);
+  }
+
+  document.body.appendChild(layer);
+  window.setTimeout(() => layer.remove(), 4200);
+}
+
+function crearBotonOpcion(texto, onClick, extraClass = "", opciones = {}) {
+  const { disabled = false } = opciones;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `option-btn ${extraClass}`.trim();
+  button.textContent = aMayusculas(texto);
+
+  if (disabled) {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
+  } else {
+    button.addEventListener("click", onClick);
+  }
+
+  return button;
+}
+
+function limpiarDesdePaso(paso) {
+  if (paso <= 1) {
+    state.sala = null;
+  }
+  if (paso <= 2) {
+    state.genero = null;
+  }
+  if (paso <= 3) {
+    state.alumno = null;
+    state.alumnosFiltrados = [];
+  }
+  if (paso <= 4) {
+    state.propuesta = null;
+    state.propuestasFiltradas = [];
+  }
+}
+
+async function cargarCatalogos() {
+  if (!supabase) {
+    throw new Error(
+      "Falta configurar js/supabase-config.js con SUPABASE_URL y SUPABASE_ANON_KEY"
+    );
+  }
+
+  const [salasRes, generosRes] = await Promise.all([
+    supabase.from("sala").select("id,nombre_sala").order("id", { ascending: true }),
+    supabase.from("genero").select("id,genero").order("id", { ascending: true })
+  ]);
+
+  if (salasRes.error) {
+    throw salasRes.error;
+  }
+
+  if (generosRes.error) {
+    throw generosRes.error;
+  }
+
+  state.salas = salasRes.data || [];
+  state.generos = generosRes.data || [];
+
+  renderSalas();
+  renderGeneros();
+}
+
+function renderSalas() {
+  salaOptions.innerHTML = "";
+  state.salas.forEach((sala) => {
+    const btn = crearBotonOpcion(sala.nombre_sala, () => {
+      state.sala = sala;
+      limpiarDesdePaso(2);
+      irAPaso(2);
+    });
+    salaOptions.appendChild(btn);
+  });
+}
+
+function renderGeneros() {
+  generoOptions.innerHTML = "";
+  state.generos.forEach((genero) => {
+    const generoNormalizado = normalizarTexto(genero.genero);
+    let claseGenero = "genero-btn";
+
+    if (generoNormalizado.includes("NINO")) {
+      claseGenero += " genero-nino";
+    } else if (generoNormalizado.includes("NINA")) {
+      claseGenero += " genero-nina";
+    }
+
+    const btn = crearBotonOpcion(genero.genero, async () => {
+      state.genero = genero;
+      state.alumno = null;
+      state.propuesta = null;
+      await cargarAlumnosFiltrados();
+      irAPaso(3);
+    }, claseGenero);
+    generoOptions.appendChild(btn);
+  });
+}
+
+async function cargarAlumnosFiltrados() {
+  alumnoOptions.innerHTML = "";
+
+  const { data, error } = await supabase
+    .from("alumno")
+    .select("id,nombre,id_sala,id_genero")
+    .eq("id_sala", state.sala.id)
+    .eq("id_genero", state.genero.id)
+    .order("nombre", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  state.alumnosFiltrados = data || [];
+
+  if (state.alumnosFiltrados.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = aMayusculas("No hay alumnos para esta seleccion");
+    alumnoOptions.appendChild(empty);
+    return;
+  }
+
+  const idsAlumnos = state.alumnosFiltrados.map((alumno) => alumno.id);
+  const { data: votosExistentes, error: errorVotos } = await supabase
+    .from("votacion")
+    .select("id_alumno")
+    .in("id_alumno", idsAlumnos);
+
+  if (errorVotos) {
+    throw errorVotos;
+  }
+
+  const alumnosQueYaVotaron = new Set(
+    (votosExistentes || []).map((voto) => voto.id_alumno)
+  );
+
+  state.alumnosFiltrados.forEach((alumno) => {
+    const yaVoto = alumnosQueYaVotaron.has(alumno.id);
+    let claseExtra = "";
+
+    if (alumno.id_genero === 1) {
+      claseExtra += " alumno-nino";
+    } else if (alumno.id_genero === 2) {
+      claseExtra += " alumno-nina";
+    }
+
+    if (yaVoto) {
+      claseExtra += " alumno-votado is-disabled";
+    }
+
+    const btn = crearBotonOpcion(
+      alumno.nombre,
+      async () => {
+        state.alumno = alumno;
+        state.propuesta = null;
+        await cargarPropuestasDeSala();
+        irAPaso(4);
+      },
+      claseExtra.trim(),
+      { disabled: yaVoto }
+    );
+
+    alumnoOptions.appendChild(btn);
+  });
+}
+
+async function alumnoYaVoto(idAlumno) {
+  const { data, error } = await supabase
+    .from("votacion")
+    .select("id_alumno")
+    .eq("id_alumno", idAlumno)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
+}
+
+async function cargarPropuestasDeSala() {
+  propuestaOptions.innerHTML = "";
+
+  const { data, error } = await supabase
+    .from("propuestas")
+    .select("id,nombre_propuesta,id_sala")
+    .eq("id_sala", state.sala.id)
+    .order("id", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  state.propuestasFiltradas = data || [];
+
+  if (state.propuestasFiltradas.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = aMayusculas("No hay propuestas disponibles para esta sala");
+    propuestaOptions.appendChild(empty);
+    return;
+  }
+
+  state.propuestasFiltradas.forEach((propuesta) => {
+    const btn = crearBotonOpcion(propuesta.nombre_propuesta, () => {
+      state.propuesta = propuesta;
+      abrirModal();
+    });
+    propuestaOptions.appendChild(btn);
+  });
+}
+
+function abrirModal() {
+  modal.classList.remove("hidden");
+}
+
+function cerrarModal() {
+  modal.classList.add("hidden");
+}
+
+async function confirmarVoto() {
+  if (!state.alumno || !state.propuesta) {
+    mostrarToast("Falta seleccionar alumno o propuesta");
+    return;
+  }
+
+  confirmYes.disabled = true;
+  confirmNo.disabled = true;
+
+  try {
+    // Doble validacion para reforzar el control de voto unico.
+    const yaVoto = await alumnoYaVoto(state.alumno.id);
+    if (yaVoto) {
+      mostrarToast("Este alumno ya voto");
+      cerrarModal();
+      return;
+    }
+
+    const { error } = await supabase.from("votacion").insert({
+      id_alumno: state.alumno.id,
+      id_propuesta: state.propuesta.id
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        mostrarToast("Este alumno ya voto");
+        cerrarModal();
+        return;
+      }
+      throw error;
+    }
+
+    cerrarModal();
+    lanzarConfetis(120);
+    irAPaso(5);
+  } finally {
+    confirmYes.disabled = false;
+    confirmNo.disabled = false;
+  }
+}
+
+function reiniciarFlujo() {
+  limpiarDesdePaso(1);
+  irAPaso(1);
+}
+
+function registrarEventos() {
+  startGate.addEventListener("click", activarInicio);
+  startGate.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activarInicio();
+    }
+  });
+
+  backButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetStep = Number(btn.dataset.goStep);
+      limpiarDesdePaso(targetStep + 1);
+      irAPaso(targetStep);
+    });
+  });
+
+  confirmNo.addEventListener("click", () => {
+    cerrarModal();
+    state.propuesta = null;
+  });
+
+  confirmYes.addEventListener("click", async () => {
+    try {
+      await confirmarVoto();
+    } catch (error) {
+      console.error(error);
+      mostrarToast("No se pudo registrar el voto");
+    }
+  });
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      cerrarModal();
+    }
+  });
+}
+
+async function init() {
+  registrarEventos();
+
+  if (!supabase) {
+    mostrarToast("Configura Supabase para comenzar", 5000);
+    return;
+  }
+
+  try {
+    await cargarCatalogos();
+  } catch (error) {
+    console.error(error);
+    mostrarToast("Error cargando datos. Revisa tu base de datos", 5000);
+  }
+}
+
+init();
