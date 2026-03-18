@@ -11,6 +11,8 @@ const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
 const toast = document.getElementById("toast");
 let toastTimeoutId = null;
+let alumnosRequestSeq = 0;
+let cargandoAlumnos = false;
 
 const state = {
   pasoActual: 1,
@@ -222,31 +224,52 @@ function renderGeneros() {
     }
 
     const btn = crearBotonOpcion(genero.genero, async () => {
+      if (cargandoAlumnos) {
+        return;
+      }
+
+      cargandoAlumnos = true;
       state.genero = genero;
       state.alumno = null;
       state.propuesta = null;
-      await cargarAlumnosFiltrados();
-      irAPaso(3);
+
+      try {
+        await cargarAlumnosFiltrados();
+        irAPaso(3);
+      } finally {
+        cargandoAlumnos = false;
+      }
     }, claseGenero);
     generoOptions.appendChild(btn);
   });
 }
 
 async function cargarAlumnosFiltrados() {
-  alumnoOptions.innerHTML = "";
+  const requestId = ++alumnosRequestSeq;
+  const salaId = state.sala?.id;
+  const generoId = state.genero?.id;
+
+  if (!salaId || !generoId) {
+    return;
+  }
 
   const { data, error } = await supabase
     .from("alumno")
     .select("id,nombre,id_sala,id_genero")
-    .eq("id_sala", state.sala.id)
-    .eq("id_genero", state.genero.id)
+    .eq("id_sala", salaId)
+    .eq("id_genero", generoId)
     .order("nombre", { ascending: true });
 
   if (error) {
     throw error;
   }
 
+  if (requestId !== alumnosRequestSeq) {
+    return;
+  }
+
   state.alumnosFiltrados = data || [];
+  alumnoOptions.innerHTML = "";
 
   if (state.alumnosFiltrados.length === 0) {
     const empty = document.createElement("p");
@@ -263,6 +286,10 @@ async function cargarAlumnosFiltrados() {
 
   if (errorVotos) {
     throw errorVotos;
+  }
+
+  if (requestId !== alumnosRequestSeq) {
+    return;
   }
 
   const alumnosQueYaVotaron = new Set(
