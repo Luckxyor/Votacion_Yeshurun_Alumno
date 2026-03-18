@@ -135,12 +135,23 @@ h1 {
   gap: 14px;
 }
 
+#salaOptions {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+#propuestaOptions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
 #alumnoOptions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 #alumnoOptions .option-btn {
   min-height: 92px;
+  font-size: clamp(1.35rem, 3.2vw, 1.75rem);
 }
 
 .grid-options {
@@ -181,6 +192,8 @@ h1 {
 
 .genero-nino {
   background: linear-gradient(135deg, #cfe8ff, #a9d2ff);
+  border: 3px solid #5f9edb;
+  box-shadow: 0 12px 20px rgba(57, 113, 170, 0.24);
 }
 
 .genero-nino::before {
@@ -189,6 +202,8 @@ h1 {
 
 .genero-nina {
   background: linear-gradient(135deg, #ffd9ea, #ffc0df);
+  border: 3px solid #d87eb1;
+  box-shadow: 0 12px 20px rgba(173, 83, 129, 0.24);
 }
 
 .genero-nina::before {
@@ -209,6 +224,34 @@ h1 {
 .option-btn.is-disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+#salaOptions .option-btn,
+#propuestaOptions .option-btn {
+  color: #3f372f;
+  border: 3px solid transparent;
+  min-height: 126px;
+  padding: 22px 16px;
+  font-size: clamp(1.45rem, 3.2vw, 1.95rem);
+  box-shadow: 0 12px 20px rgba(67, 53, 32, 0.2);
+}
+
+#salaOptions .option-btn:nth-child(3n + 1),
+#propuestaOptions .option-btn:nth-child(3n + 1) {
+  background: linear-gradient(135deg, #bfe9b5, #a7dc97);
+  border-color: #6ea962;
+}
+
+#salaOptions .option-btn:nth-child(3n + 2),
+#propuestaOptions .option-btn:nth-child(3n + 2) {
+  background: linear-gradient(135deg, #f4b1a9, #eb9a90);
+  border-color: #c57168;
+}
+
+#salaOptions .option-btn:nth-child(3n + 3),
+#propuestaOptions .option-btn:nth-child(3n + 3) {
+  background: linear-gradient(135deg, #ffd49d, #ffc07f);
+  border-color: #d1924d;
 }
 
 #alumnoOptions .option-btn.alumno-nino {
@@ -313,15 +356,20 @@ h1 {
 
 .toast {
   position: fixed;
-  top: 18px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 680px);
+  background: rgba(31, 41, 55, 0.96);
   color: #f9fafb;
-  border-radius: 12px;
-  padding: 10px 16px;
+  border-radius: 20px;
+  padding: 26px 28px;
   box-shadow: var(--shadow);
   z-index: 30;
+  text-align: center;
+  font-family: "Baloo 2", sans-serif;
+  font-size: clamp(1.35rem, 3.2vw, 2rem);
+  line-height: 1.25;
   font-weight: 700;
 }
 
@@ -385,9 +433,34 @@ h1 {
 
   #alumnoOptions .option-btn {
     min-height: 84px;
+    font-size: clamp(1.1rem, 4.6vw, 1.35rem);
+  }
+
+  #salaOptions {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  #propuestaOptions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  #salaOptions .option-btn,
+  #propuestaOptions .option-btn {
+    min-height: 98px;
+    padding: 14px 8px;
+    font-size: clamp(1.2rem, 4.5vw, 1.45rem);
   }
 
   .modal-actions {
     grid-template-columns: 1fr;
+  }
+
+  .toast {
+    width: min(92vw, 520px);
+    padding: 22px 20px;
+    border-radius: 16px;
+    font-size: clamp(1.15rem, 5vw, 1.55rem);
   }
 }

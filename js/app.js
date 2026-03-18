@@ -10,6 +10,7 @@ const modal = document.getElementById("confirmModal");
 const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
 const toast = document.getElementById("toast");
+let toastTimeoutId = null;
 
 const state = {
   pasoActual: 1,
@@ -34,6 +35,9 @@ const hasConfig =
 const supabase = hasConfig
   ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
   : null;
+
+const MENSAJE_ALUMNO_YA_VOTO =
+  "UPS... ESTE CHICO YA VOTO. SI ES UN ERROR, AVISALE A TU MAESTRO O MAESTRA PARA QUE LO SOLUCIONE";
 
 function aMayusculas(valor) {
   return String(valor ?? "").toUpperCase();
@@ -66,10 +70,18 @@ function activarInicio() {
   irAPaso(1);
 }
 
-function mostrarToast(mensaje, duracion = 2500) {
+function mostrarToast(mensaje, duracion = 5000) {
   toast.textContent = aMayusculas(mensaje);
   toast.classList.remove("hidden");
-  window.setTimeout(() => toast.classList.add("hidden"), duracion);
+
+  if (toastTimeoutId) {
+    window.clearTimeout(toastTimeoutId);
+  }
+
+  toastTimeoutId = window.setTimeout(() => {
+    toast.classList.add("hidden");
+    toastTimeoutId = null;
+  }, duracion);
 }
 
 function lanzarConfetis(cantidad = 120) {
@@ -105,17 +117,37 @@ function lanzarConfetis(cantidad = 120) {
 }
 
 function crearBotonOpcion(texto, onClick, extraClass = "", opciones = {}) {
-  const { disabled = false } = opciones;
+  const { disabled = false, onDisabledClick = null } = opciones;
   const button = document.createElement("button");
   button.type = "button";
   button.className = `option-btn ${extraClass}`.trim();
   button.textContent = aMayusculas(texto);
 
   if (disabled) {
-    button.disabled = true;
     button.setAttribute("aria-disabled", "true");
-  } else {
-    button.addEventListener("click", onClick);
+  }
+
+  button.addEventListener("click", (event) => {
+    if (disabled) {
+      event.preventDefault();
+      if (typeof onDisabledClick === "function") {
+        onDisabledClick();
+      }
+      return;
+    }
+
+    onClick();
+  });
+
+  if (disabled) {
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (typeof onDisabledClick === "function") {
+          onDisabledClick();
+        }
+      }
+    });
   }
 
   return button;
@@ -260,7 +292,10 @@ async function cargarAlumnosFiltrados() {
         irAPaso(4);
       },
       claseExtra.trim(),
-      { disabled: yaVoto }
+      {
+        disabled: yaVoto,
+        onDisabledClick: () => mostrarToast(MENSAJE_ALUMNO_YA_VOTO)
+      }
     );
 
     alumnoOptions.appendChild(btn);
@@ -333,7 +368,7 @@ async function confirmarVoto() {
     // Doble validacion para reforzar el control de voto unico.
     const yaVoto = await alumnoYaVoto(state.alumno.id);
     if (yaVoto) {
-      mostrarToast("Este alumno ya voto");
+      mostrarToast(MENSAJE_ALUMNO_YA_VOTO);
       cerrarModal();
       return;
     }
@@ -345,7 +380,7 @@ async function confirmarVoto() {
 
     if (error) {
       if (error.code === "23505") {
-        mostrarToast("Este alumno ya voto");
+        mostrarToast(MENSAJE_ALUMNO_YA_VOTO);
         cerrarModal();
         return;
       }
