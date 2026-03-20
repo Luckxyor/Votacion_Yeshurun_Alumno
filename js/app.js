@@ -40,6 +40,7 @@ const supabase = hasConfig
 
 const MENSAJE_ALUMNO_YA_VOTO =
   "UPS... ESTE CHICO YA VOTO. SI ES UN ERROR, AVISALE A TU MAESTRO O MAESTRA PARA QUE LO SOLUCIONE";
+const EXTENSIONES_IMAGEN_PROPUESTA = ["jpeg", "jpg", "png", "webp"];
 
 function aMayusculas(valor) {
   return String(valor ?? "").toUpperCase();
@@ -51,12 +52,74 @@ function normalizarTexto(valor) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function textoSinAcentos(valor) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function generarCandidatosImagenPropuesta(nombrePropuesta) {
+  const original = String(nombrePropuesta ?? "").trim();
+  const sinAcentos = textoSinAcentos(nombrePropuesta);
+  const slug = sinAcentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const junto = sinAcentos.replace(/[^a-z0-9]/gi, "");
+  const lower = sinAcentos.toLowerCase();
+  const upper = sinAcentos.toUpperCase();
+  const capitalizado = lower.replace(/\b\w/g, (letra) => letra.toUpperCase());
+
+  const bases = [...new Set([original, sinAcentos, lower, upper, capitalizado, slug, junto])]
+    .map((base) => base.trim())
+    .filter(Boolean);
+
+  const urls = [];
+  bases.forEach((base) => {
+    EXTENSIONES_IMAGEN_PROPUESTA.forEach((extension) => {
+      urls.push(`images/images-propuestas/${base}.${extension}`);
+    });
+  });
+
+  return urls;
+}
+
+function crearImagenPropuesta(nombrePropuesta) {
+  const imagen = document.createElement("img");
+  const candidatos = generarCandidatosImagenPropuesta(nombrePropuesta);
+  let indiceActual = 0;
+
+  imagen.className = "propuesta-img";
+  imagen.alt = aMayusculas(nombrePropuesta);
+  imagen.loading = "lazy";
+
+  const cargarSiguiente = () => {
+    if (indiceActual >= candidatos.length) {
+      imagen.classList.add("hidden");
+      return;
+    }
+
+    imagen.src = candidatos[indiceActual];
+    indiceActual += 1;
+  };
+
+  imagen.addEventListener("error", cargarSiguiente);
+  cargarSiguiente();
+  return imagen;
+}
+
 function irAPaso(numeroPaso) {
   state.pasoActual = numeroPaso;
   screens.forEach((screen) => {
     const isTarget = Number(screen.dataset.step) === numeroPaso;
     screen.classList.toggle("screen-active", isTarget);
   });
+}
+
+function actualizarLayoutAlumnos() {
+  const cantidad = state.alumnosFiltrados.length;
+  alumnoOptions.classList.toggle("is-compact", cantidad > 8);
 }
 
 function activarInicio() {
@@ -270,6 +333,7 @@ async function cargarAlumnosFiltrados() {
 
   state.alumnosFiltrados = data || [];
   alumnoOptions.innerHTML = "";
+  actualizarLayoutAlumnos();
 
   if (state.alumnosFiltrados.length === 0) {
     const empty = document.createElement("p");
@@ -366,10 +430,20 @@ async function cargarPropuestasDeSala() {
   }
 
   state.propuestasFiltradas.forEach((propuesta) => {
-    const btn = crearBotonOpcion(propuesta.nombre_propuesta, () => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-btn propuesta-btn";
+    btn.setAttribute("aria-label", aMayusculas(propuesta.nombre_propuesta));
+
+    const imagen = crearImagenPropuesta(propuesta.nombre_propuesta);
+
+    btn.appendChild(imagen);
+
+    btn.addEventListener("click", () => {
       state.propuesta = propuesta;
       abrirModal();
     });
+
     propuestaOptions.appendChild(btn);
   });
 }

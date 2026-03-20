@@ -141,17 +141,49 @@ h1 {
 }
 
 #propuestaOptions {
+  width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+
+#propuestaOptions .option-btn.propuesta-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 300px;
+  width: 270px;
+  padding: 16px 20px;
+}
+
+#propuestaOptions .propuesta-img {
+  width: min(100%, 320px);
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 #alumnoOptions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+#alumnoOptions.is-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 #alumnoOptions .option-btn {
-  min-height: 92px;
-  font-size: clamp(1.35rem, 3.2vw, 1.75rem);
+  min-height: 90px;
+  font-size: clamp(1.4rem, 3.3vw, 1.85rem);
+}
+
+#alumnoOptions.is-compact .option-btn {
+  min-height: 78px;
+  font-size: clamp(1.08rem, 2.4vw, 1.28rem);
+  padding: 12px 10px;
 }
 
 .grid-options {
@@ -432,8 +464,19 @@ h1 {
   }
 
   #alumnoOptions .option-btn {
-    min-height: 84px;
-    font-size: clamp(1.1rem, 4.6vw, 1.35rem);
+    min-height: 88px;
+    font-size: clamp(1.15rem, 4.6vw, 1.45rem);
+  }
+
+  #alumnoOptions.is-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #alumnoOptions.is-compact .option-btn {
+    min-height: 72px;
+    font-size: clamp(0.98rem, 3.7vw, 1.18rem);
+    padding: 10px 8px;
   }
 
   #salaOptions {
@@ -444,6 +487,17 @@ h1 {
   #propuestaOptions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  #propuestaOptions .option-btn.propuesta-btn {
+    min-height: 160px;
+    gap: 0;
+    padding: 10px 8px;
+  }
+
+  #propuestaOptions .propuesta-img {
+    width: min(100%, 120px);
+    border-radius: 10px;
   }
 
   #salaOptions .option-btn,
