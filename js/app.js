@@ -2,28 +2,18 @@ const app = document.getElementById("app");
 const startGate = document.getElementById("startGate");
 const screens = [...document.querySelectorAll(".screen")];
 const salaOptions = document.getElementById("salaOptions");
-const generoOptions = document.getElementById("generoOptions");
-const alumnoOptions = document.getElementById("alumnoOptions");
 const propuestaOptions = document.getElementById("propuestaOptions");
 const backButtons = [...document.querySelectorAll("[data-go-step]")];
-const modal = document.getElementById("confirmModal");
-const confirmYes = document.getElementById("confirmYes");
-const confirmNo = document.getElementById("confirmNo");
 const toast = document.getElementById("toast");
 let toastTimeoutId = null;
-let alumnosRequestSeq = 0;
-let cargandoAlumnos = false;
+let votando = false;
 
 const state = {
   pasoActual: 1,
   inicioCompletado: false,
   sala: null,
-  genero: null,
-  alumno: null,
   propuesta: null,
   salas: [],
-  generos: [],
-  alumnosFiltrados: [],
   propuestasFiltradas: []
 };
 
@@ -38,18 +28,10 @@ const supabase = hasConfig
   ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
   : null;
 
-const MENSAJE_ALUMNO_YA_VOTO =
-  "UPS... ESTE CHICO YA VOTO. SI ES UN ERROR, AVISALE A TU MAESTRO O MAESTRA PARA QUE LO SOLUCIONE";
-const EXTENSIONES_IMAGEN_PROPUESTA = ["jpeg", "jpg", "png", "webp"];
+const EXTENSIONES_IMAGEN_PROPUESTA = ["jpg", "jpeg", "png", "webp"];
 
 function aMayusculas(valor) {
   return String(valor ?? "").toUpperCase();
-}
-
-function normalizarTexto(valor) {
-  return aMayusculas(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function textoSinAcentos(valor) {
@@ -117,11 +99,6 @@ function irAPaso(numeroPaso) {
   });
 }
 
-function actualizarLayoutAlumnos() {
-  const cantidad = state.alumnosFiltrados.length;
-  alumnoOptions.classList.toggle("is-compact", cantidad > 8);
-}
-
 function activarInicio() {
   if (state.inicioCompletado) {
     return;
@@ -181,40 +158,12 @@ function lanzarConfetis(cantidad = 120) {
   window.setTimeout(() => layer.remove(), 4200);
 }
 
-function crearBotonOpcion(texto, onClick, extraClass = "", opciones = {}) {
-  const { disabled = false, onDisabledClick = null } = opciones;
+function crearBotonOpcion(texto, onClick, extraClass = "") {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `option-btn ${extraClass}`.trim();
   button.textContent = aMayusculas(texto);
-
-  if (disabled) {
-    button.setAttribute("aria-disabled", "true");
-  }
-
-  button.addEventListener("click", (event) => {
-    if (disabled) {
-      event.preventDefault();
-      if (typeof onDisabledClick === "function") {
-        onDisabledClick();
-      }
-      return;
-    }
-
-    onClick();
-  });
-
-  if (disabled) {
-    button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        if (typeof onDisabledClick === "function") {
-          onDisabledClick();
-        }
-      }
-    });
-  }
-
+  button.addEventListener("click", onClick);
   return button;
 }
 
@@ -223,13 +172,6 @@ function limpiarDesdePaso(paso) {
     state.sala = null;
   }
   if (paso <= 2) {
-    state.genero = null;
-  }
-  if (paso <= 3) {
-    state.alumno = null;
-    state.alumnosFiltrados = [];
-  }
-  if (paso <= 4) {
     state.propuesta = null;
     state.propuestasFiltradas = [];
   }
@@ -242,169 +184,38 @@ async function cargarCatalogos() {
     );
   }
 
-  const [salasRes, generosRes] = await Promise.all([
-    supabase.from("sala").select("id,nombre_sala").order("id", { ascending: true }),
-    supabase.from("genero").select("id,genero").order("id", { ascending: true })
-  ]);
+  const { data, error } = await supabase
+    .from("sala")
+    .select("id,nombre_sala")
+    .order("id", { ascending: true });
 
-  if (salasRes.error) {
-    throw salasRes.error;
+  if (error) {
+    throw error;
   }
 
-  if (generosRes.error) {
-    throw generosRes.error;
-  }
-
-  state.salas = salasRes.data || [];
-  state.generos = generosRes.data || [];
-
+  state.salas = data || [];
   renderSalas();
-  renderGeneros();
 }
 
 function renderSalas() {
   salaOptions.innerHTML = "";
+
   state.salas.forEach((sala) => {
-    const btn = crearBotonOpcion(sala.nombre_sala, () => {
+    const btn = crearBotonOpcion(sala.nombre_sala, async () => {
       state.sala = sala;
       limpiarDesdePaso(2);
-      irAPaso(2);
-    });
-    salaOptions.appendChild(btn);
-  });
-}
-
-function renderGeneros() {
-  generoOptions.innerHTML = "";
-  state.generos.forEach((genero) => {
-    const generoNormalizado = normalizarTexto(genero.genero);
-    let claseGenero = "genero-btn";
-
-    if (generoNormalizado.includes("NINO")) {
-      claseGenero += " genero-nino";
-    } else if (generoNormalizado.includes("NINA")) {
-      claseGenero += " genero-nina";
-    }
-
-    const btn = crearBotonOpcion(genero.genero, async () => {
-      if (cargandoAlumnos) {
-        return;
-      }
-
-      cargandoAlumnos = true;
-      state.genero = genero;
-      state.alumno = null;
-      state.propuesta = null;
 
       try {
-        await cargarAlumnosFiltrados();
-        irAPaso(3);
-      } finally {
-        cargandoAlumnos = false;
-      }
-    }, claseGenero);
-    generoOptions.appendChild(btn);
-  });
-}
-
-async function cargarAlumnosFiltrados() {
-  const requestId = ++alumnosRequestSeq;
-  const salaId = state.sala?.id;
-  const generoId = state.genero?.id;
-
-  if (!salaId || !generoId) {
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("alumno")
-    .select("id,nombre,id_sala,id_genero")
-    .eq("id_sala", salaId)
-    .eq("id_genero", generoId)
-    .order("nombre", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  if (requestId !== alumnosRequestSeq) {
-    return;
-  }
-
-  state.alumnosFiltrados = data || [];
-  alumnoOptions.innerHTML = "";
-  actualizarLayoutAlumnos();
-
-  if (state.alumnosFiltrados.length === 0) {
-    const empty = document.createElement("p");
-    empty.textContent = aMayusculas("No hay alumnos para esta seleccion");
-    alumnoOptions.appendChild(empty);
-    return;
-  }
-
-  const idsAlumnos = state.alumnosFiltrados.map((alumno) => alumno.id);
-  const { data: votosExistentes, error: errorVotos } = await supabase
-    .from("votacion")
-    .select("id_alumno")
-    .in("id_alumno", idsAlumnos);
-
-  if (errorVotos) {
-    throw errorVotos;
-  }
-
-  if (requestId !== alumnosRequestSeq) {
-    return;
-  }
-
-  const alumnosQueYaVotaron = new Set(
-    (votosExistentes || []).map((voto) => voto.id_alumno)
-  );
-
-  state.alumnosFiltrados.forEach((alumno) => {
-    const yaVoto = alumnosQueYaVotaron.has(alumno.id);
-    let claseExtra = "";
-
-    if (alumno.id_genero === 1) {
-      claseExtra += " alumno-nino";
-    } else if (alumno.id_genero === 2) {
-      claseExtra += " alumno-nina";
-    }
-
-    if (yaVoto) {
-      claseExtra += " alumno-votado is-disabled";
-    }
-
-    const btn = crearBotonOpcion(
-      alumno.nombre,
-      async () => {
-        state.alumno = alumno;
-        state.propuesta = null;
         await cargarPropuestasDeSala();
-        irAPaso(4);
-      },
-      claseExtra.trim(),
-      {
-        disabled: yaVoto,
-        onDisabledClick: () => mostrarToast(MENSAJE_ALUMNO_YA_VOTO)
+        irAPaso(2);
+      } catch (error) {
+        console.error(error);
+        mostrarToast("No se pudieron cargar las propuestas");
       }
-    );
+    });
 
-    alumnoOptions.appendChild(btn);
+    salaOptions.appendChild(btn);
   });
-}
-
-async function alumnoYaVoto(idAlumno) {
-  const { data, error } = await supabase
-    .from("votacion")
-    .select("id_alumno")
-    .eq("id_alumno", idAlumno)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return Boolean(data);
 }
 
 async function cargarPropuestasDeSala() {
@@ -436,70 +247,49 @@ async function cargarPropuestasDeSala() {
     btn.setAttribute("aria-label", aMayusculas(propuesta.nombre_propuesta));
 
     const imagen = crearImagenPropuesta(propuesta.nombre_propuesta);
-
     btn.appendChild(imagen);
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       state.propuesta = propuesta;
-      abrirModal();
+      try {
+        await confirmarVoto();
+      } catch (error) {
+        console.error(error);
+        mostrarToast("No se pudo registrar el voto");
+      }
     });
 
     propuestaOptions.appendChild(btn);
   });
 }
 
-function abrirModal() {
-  modal.classList.remove("hidden");
-}
-
-function cerrarModal() {
-  modal.classList.add("hidden");
-}
-
 async function confirmarVoto() {
-  if (!state.alumno || !state.propuesta) {
-    mostrarToast("Falta seleccionar alumno o propuesta");
+  if (votando) {
     return;
   }
 
-  confirmYes.disabled = true;
-  confirmNo.disabled = true;
+  if (!state.propuesta) {
+    mostrarToast("Falta seleccionar propuesta");
+    return;
+  }
+
+  votando = true;
 
   try {
-    // Doble validacion para reforzar el control de voto unico.
-    const yaVoto = await alumnoYaVoto(state.alumno.id);
-    if (yaVoto) {
-      mostrarToast(MENSAJE_ALUMNO_YA_VOTO);
-      cerrarModal();
-      return;
-    }
-
     const { error } = await supabase.from("votacion").insert({
-      id_alumno: state.alumno.id,
-      id_propuesta: state.propuesta.id
+      id_propuesta: state.propuesta.id,
+      fecha_voto: new Date().toISOString()
     });
 
     if (error) {
-      if (error.code === "23505") {
-        mostrarToast(MENSAJE_ALUMNO_YA_VOTO);
-        cerrarModal();
-        return;
-      }
       throw error;
     }
 
-    cerrarModal();
     lanzarConfetis(120);
-    irAPaso(5);
+    irAPaso(3);
   } finally {
-    confirmYes.disabled = false;
-    confirmNo.disabled = false;
+    votando = false;
   }
-}
-
-function reiniciarFlujo() {
-  limpiarDesdePaso(1);
-  irAPaso(1);
 }
 
 function registrarEventos() {
@@ -519,25 +309,6 @@ function registrarEventos() {
     });
   });
 
-  confirmNo.addEventListener("click", () => {
-    cerrarModal();
-    state.propuesta = null;
-  });
-
-  confirmYes.addEventListener("click", async () => {
-    try {
-      await confirmarVoto();
-    } catch (error) {
-      console.error(error);
-      mostrarToast("No se pudo registrar el voto");
-    }
-  });
-
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      cerrarModal();
-    }
-  });
 }
 
 async function init() {
